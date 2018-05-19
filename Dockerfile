@@ -1,23 +1,50 @@
-FROM php:7-fpm-alpine
+# See https://github.com/docker-library/php/blob/master/7.1/fpm/Dockerfile
+FROM php:7.2.5-fpm
+ARG TIMEZONE
 
-RUN apk upgrade --update \
-    && apk add git vim autoconf libmcrypt-dev libxml2-dev postgresql-dev libpng-dev libxslt-dev bzip2 bzip2-dev icu-dev g++ make ca-certificates \
-    && pecl install redis-3.1.1 && docker-php-ext-enable redis \
-    && pecl install xdebug-2.5.1 && docker-php-ext-enable xdebug \
-    && docker-php-ext-install bz2 zip gd mcrypt mbstring bcmath opcache intl soap pgsql pdo_pgsql pdo_mysql xsl \
-    && curl -sS "https://getcomposer.org/installer?v=1.3.1" | php && mv composer.phar /usr/bin/composer \
-    && mkdir -p /etc/ssl/certs/ && update-ca-certificates --fresh \
-    && apk del --purge g++ make autoconf ca-certificates \
+MAINTAINER Maxence POUTORD <maxence.poutord@gmail.com>
 
-    && echo "xdebug.remote_enable=on" >> /usr/local/etc/php/conf.d/xdebug.ini \
-    && echo "xdebug.remote_host=10.0.2.2" >> /usr/local/etc/php/conf.d/xdebug.ini \
-    && echo "xdebug.remote_autostart=off" >> /usr/local/etc/php/conf.d/xdebug.ini \
-    && echo "xdebug.remote_connect_back=On" >> /usr/local/etc/php/conf.d/xdebug.ini \
-    && echo "xdebug.idekey=PHPSTORM" >> /usr/local/etc/php/conf.d/xdebug.ini \
+RUN apt-get update && apt-get install -y \
+    openssl \
+    git \
+    unzip \
+    curl \
+    sudo \
+    gnupg \
+    gnupg2
 
-    && echo "memory_limit = 128M" >> /usr/local/etc/php/conf.d/php.ini \
-    && echo "upload_max_filesize = 8M" >> /usr/local/etc/php/conf.d/php.ini
+# Install Composer
+RUN curl -sS https://getcomposer.org/installer | php -- --install-dir=/usr/local/bin --filename=composer
+RUN composer --version
 
-CMD ["php-fpm", "-F"]
+# Set timezone
+RUN ln -snf /usr/share/zoneinfo/${TIMEZONE} /etc/localtime && echo ${TIMEZONE} > /etc/timezone
+RUN printf '[PHP]\ndate.timezone = "%s"\n', ${TIMEZONE} > /usr/local/etc/php/conf.d/tzone.ini
+RUN "date"
+
+# Type docker-php-ext-install to see available extensions
+RUN docker-php-ext-install pdo pdo_mysql
+
+# install xdebug
+RUN pecl install xdebug
+RUN docker-php-ext-enable xdebug \
+    && echo "error_reporting = E_ALL" >> /usr/local/etc/php/conf.d/docker-php-ext-xdebug.ini \
+    && echo "display_startup_errors = On" >> /usr/local/etc/php/conf.d/docker-php-ext-xdebug.ini \
+    && echo "display_errors = On" >> /usr/local/etc/php/conf.d/docker-php-ext-xdebug.ini \
+    && echo "xdebug.remote_enable=1" >> /usr/local/etc/php/conf.d/docker-php-ext-xdebug.ini \
+    && echo "xdebug.remote_connect_back=0" >> /usr/local/etc/php/conf.d/docker-php-ext-xdebug.ini \
+    && echo "xdebug.idekey=\"PHPSTORM\"" >> /usr/local/etc/php/conf.d/docker-php-ext-xdebug.ini \
+    && echo "xdebug.remote_port=9000" >> /usr/local/etc/php/conf.d/docker-php-ext-xdebug.ini \
+    && echo "xdebug.remote_autostart=off" >> /usr/local/etc/php/conf.d/docker-php-ext-xdebug.ini \
+    && echo "xdebug.remote_host=10.254.254.254" >> /usr/local/etc/php/conf.d/docker-php-ext-xdebug.ini
+
+RUN echo 'alias sf="php bin/console"' >> ~/.bashrc \
+    && echo 'alias phpunit="php bin/phpunit"' >> ~/.bashrc \
+    && echo 'alias encore="./node_modules/.bin/encore"' >> ~/.bashrc
+
+RUN curl -sL https://deb.nodesource.com/setup_8.x | sudo bash - \
+    && apt-get install -yq nodejs build-essential
+
+WORKDIR /var/www/symfony
 
 EXPOSE 9000
