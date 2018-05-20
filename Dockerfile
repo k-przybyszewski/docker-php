@@ -46,5 +46,3 @@ RUN curl -sL https://deb.nodesource.com/setup_8.x | sudo bash - \
     && apt-get install -yq nodejs build-essential
 
 WORKDIR /var/www/symfony
-
-EXPOSE 9000
