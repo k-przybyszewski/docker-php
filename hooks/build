@@ -1,0 +1,2 @@
+#!/bin/sh
+docker build --build-arg TIMEZONE=Europe\Warsaw -t $IMAGE_NAME .
